@@ -462,6 +462,14 @@ extension AetherEngine {
     }
 
 
+    /// Byte offset in the source file of the keyframe at or before `seconds` (the engine's 0-based
+    /// playback time), looked up in the container's own index (MKV Cues, MP4 sample tables). Hosts use it
+    /// to place a time on a byte-laid-out view of the file (for example a cache map). Never blocks: nil when
+    /// there's no session, no index for the video stream, or the demuxer is mid-read (try again later).
+    public func sourceByteOffset(atSeconds seconds: Double) -> Int64? {
+        softwareHost?.sourceByteOffset(atSeconds: seconds) ?? nativeVideoSession?.sourceByteOffset(atSeconds: seconds)
+    }
+
     /// Lifetime bytes the session's playback reader pulled from the source. Feeds the sampler's
     /// instant + average bitrate and `LiveTelemetry.demuxerBytesFetched`. 0 before a reader exists.
     ///

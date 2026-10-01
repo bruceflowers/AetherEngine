@@ -2134,6 +2134,12 @@ public final class HLSVideoEngine: @unchecked Sendable {
         return (producer, cache, server, demuxer, audioBridge)
     }
 
+    /// Source byte offset of the indexed keyframe at or before `seconds` on the current demuxer (non-blocking).
+    func sourceByteOffset(atSeconds seconds: Double) -> Int64? {
+        guard let dem = subsystemSnapshot().demuxer else { return nil }
+        return dem.indexedVideoByteOffset(atOrBefore: seconds)
+    }
+
     /// Bytes this session pulled from the SOURCE, across every demuxer it has had (see
     /// `retiredDemuxerBytes`). Not the same link as `LiveTelemetry.networkTransferredBytes`, which on
     /// the native path counts what AVPlayer pulled from the loopback server.

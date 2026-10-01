@@ -1214,6 +1214,41 @@ public final class Demuxer: @unchecked Sendable {
         }
     }
 
+    /// Byte offset in the source of the last indexed keyframe at or before `seconds` (0-based from the
+    /// stream's start), from libavformat's own index (MKV Cues, MP4 stss, ...). nil when the container
+    /// has no index for the stream, or when the demuxer is busy: this never waits for `accessLock`
+    /// (a pump read can hold it across a slow network read), so it is safe to call from the main actor.
+    func indexedVideoByteOffset(atOrBefore seconds: Double) -> Int64? {
+        guard seconds.isFinite, accessLock.try() else { return nil }
+        defer { accessLock.unlock() }
+        // Resolve the video stream under the lock too: av_find_best_stream must not race a pump read.
+        guard let ctx = formatContext else { return nil }
+        let streamIndex = av_find_best_stream(ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nil, 0)
+        guard streamIndex >= 0, streamIndex < Int32(ctx.pointee.nb_streams),
+              let stream = ctx.pointee.streams[Int(streamIndex)] else { return nil }
+        let count = avformat_index_get_entries_count(stream)
+        guard count > 0 else { return nil }
+        let tb = stream.pointee.time_base
+        guard tb.num > 0, tb.den > 0 else { return nil }
+        let start = stream.pointee.start_time == Int64.min ? 0 : stream.pointee.start_time
+        let target = start &+ Int64((max(0, seconds) * Double(tb.den) / Double(tb.num)).rounded(.down))
+        // Entries are sorted by timestamp: binary search for the last one <= target, then step back to a keyframe.
+        var lo: Int32 = 0, hi: Int32 = count - 1, found: Int32 = -1
+        while lo <= hi {
+            let mid = lo + (hi - lo) / 2
+            guard let e = avformat_index_get_entry(stream, mid) else { return nil }
+            if e.pointee.timestamp <= target { found = mid; lo = mid + 1 } else { hi = mid - 1 }
+        }
+        var i = found
+        while i >= 0 {
+            if let e = avformat_index_get_entry(stream, i), e.pointee.flags & 0x0001 != 0, e.pointee.pos >= 0 {
+                return e.pointee.pos
+            }
+            i -= 1
+        }
+        return nil
+    }
+
     /// Keyframe timestamps in stream native timebase from libavformat's index.
     /// MKV populates from Cues lazily on first seek (cue-prewarm in
     /// HLSVideoEngine.start() ensures it's ready). MP4 stss / MPEG-TS populate

@@ -36,6 +36,12 @@ final class SoftwarePlaybackHost {
         demuxer?.ioWindowDiagnostics
     }
 
+    /// Source byte offset of the indexed keyframe at or before `seconds` (non-blocking).
+    func sourceByteOffset(atSeconds seconds: Double) -> Int64? {
+        guard let dem = demuxer else { return nil }
+        return dem.indexedVideoByteOffset(atOrBefore: seconds)
+    }
+
     /// #240: lifetime bytes this pump pulled from the source, so the memprobe can put it next to the
     /// subtitle side reader's own total and say which one took the link.
     var demuxerBytesFetched: Int64? {

@@ -743,6 +743,29 @@ extension HLSVideoEngine {
     }
 
     /// HE-AAC (SBR, profile=4) and HE-AACv2 (PS, profile=28) stream-copy cleanly when an ASC is present (MP4 esds, MKV CodecPrivate). Bridge only when ASC is absent (live ADTS/MPEG-TS): the synthesized 2-byte ASC declares LC at the SBR output rate, which AudioToolbox decodes as garbage (-11821; device repro: NBC HE-AAC). frameSize=2048 also flags SBR.
+    /// An ASC with channelConfiguration 0 defers the layout to a program_config_element. AVPlayer plays it from a progressive MP4 but rejects it in fMP4 HLS (-11829 / -12848), so it bridges.
+    static func aacConfigUsesPCE(_ asc: [UInt8]) -> Bool {
+        guard asc.count >= 2 else { return false }
+        var bit = 0
+        func read(_ n: Int) -> Int? {
+            var v = 0
+            for _ in 0..<n {
+                guard bit / 8 < asc.count else { return nil }
+                v = (v << 1) | Int((asc[bit / 8] >> (7 - UInt8(bit % 8))) & 1)
+                bit += 1
+            }
+            return v
+        }
+        guard var objectType = read(5) else { return false }
+        if objectType == 31 {
+            guard let ext = read(6) else { return false }
+            objectType = 32 + ext
+        }
+        guard let frequencyIndex = read(4) else { return false }
+        if frequencyIndex == 15, read(24) == nil { return false }
+        return read(4) == 0
+    }
+
     static func aacRequiresBridge(profile: Int32, frameSize: Int32, hasASC: Bool) -> Bool {
         guard !hasASC else { return false }
         return profile == 4        // FF_PROFILE_AAC_HE

@@ -1614,11 +1614,15 @@ public final class HLSVideoEngine: @unchecked Sendable {
                     frameSize: acpForHE.frame_size,
                     hasASC: hasASC
                 )
-            if compat.requiresBridge || isHEAAC {
+            let isPCEAAC = acpForHE.codec_id == AV_CODEC_ID_AAC && hasASC
+                && Self.aacConfigUsesPCE(Array(UnsafeBufferPointer(start: acpForHE.extradata, count: Int(acpForHE.extradata_size))))
+            if compat.requiresBridge || isHEAAC || isPCEAAC {
                 bridgePreferred = true
                 EngineLog.emit(
                     isHEAAC
                         ? "[HLSVideoEngine] audio: HE-AAC (profile=\(acpForHE.profile) frameSize=\(acpForHE.frame_size)), ADTS stream-copy would mis-signal SBR, bridging instead"
+                        : isPCEAAC
+                        ? "[HLSVideoEngine] audio: AAC with a PCE channel layout (channelConfiguration=0), AVPlayer rejects it in fMP4, bridging instead"
                         : "[HLSVideoEngine] audio: codec=\(compat) (bridge required), decoding + "
                           + Self.encoderLabel(AudioBridge.bridgeEncoder(
                                 for: audioBridgeMode,

@@ -10,6 +10,19 @@ import Testing
 @Suite("AAC bridge routing")
 struct AACBridgeRoutingTests {
 
+    @Test("AAC whose ASC defers the channel layout to a PCE bridges")
+    func pceChannelLayoutBridges() {
+        // 6-channel AAC-LC at 48 kHz with channelConfiguration 0 and a PCE.
+        #expect(HLSVideoEngine.aacConfigUsesPCE([0x11, 0x80, 0x04, 0xC8, 0x44, 0x00, 0x20, 0x00, 0xC4, 0x0D]) == true)
+    }
+
+    @Test("AAC with a standard channelConfiguration stream-copies")
+    func standardChannelConfigurationStreamCopies() {
+        #expect(HLSVideoEngine.aacConfigUsesPCE([0x11, 0x90]) == false)  // LC, 48 kHz, stereo
+        #expect(HLSVideoEngine.aacConfigUsesPCE([0x11, 0xB0]) == false)  // LC, 48 kHz, 5.1
+        #expect(HLSVideoEngine.aacConfigUsesPCE([0x11]) == false)
+    }
+
     @Test("HE-AAC with an ASC stream-copies (issue #33)")
     func heAacWithASCStreamCopies() {
         #expect(HLSVideoEngine.aacRequiresBridge(profile: 4, frameSize: 2048, hasASC: true) == false)
